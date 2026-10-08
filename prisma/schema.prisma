@@ -1,0 +1,887 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Student {
+  id                Int       @id @default(autoincrement())
+  studentId         String    @unique
+  firstName         String
+  lastName          String?
+  fatherName        String
+  motherName        String?
+  dateOfBirth       DateTime
+  gender            Gender
+  age               Int
+  religion          String?
+  nationality       String    @default("Pakistani")
+  bloodGroup        String?
+  profileImage      String?
+
+  phone             String?
+  email             String?
+  address           String
+  city              String
+
+  guardianName      String
+  guardianPhone     String
+  guardianRelation  String
+  guardianCnic      String?
+
+  classId           Int
+  class             Class     @relation(fields: [classId], references: [id])
+  section           String?
+  rollNumber        String?
+  admissionDate     DateTime
+  status            StudentStatus @default(ACTIVE)
+  parents  ParentStudent[]
+  attendance  StudentAttendance[]
+  examMarks ExamMark[]
+  leaveRequests LeaveRequest[]
+  feeCollections FeeCollection[]
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@map("students")
+}
+
+model Class {
+  id        Int       @id @default(autoincrement())
+  name      String    @unique
+  students  Student[]
+  teachers  TeacherClass[]
+  timetable  TimetableEntry[]
+  sections  Section[]
+  subjects  Subject[]
+  syllabus  Syllabus[]
+  messages  Message[]
+  libraryMembers LibraryMember[]
+  exams     Exam[]
+  feeStructures FeeStructure[]
+  createdAt DateTime  @default(now())
+
+  @@map("classes")
+}
+
+enum Gender {
+  MALE
+  FEMALE
+}
+
+enum StudentStatus {
+  ACTIVE
+  INACTIVE
+  GRADUATED
+  TRANSFERRED
+  SUSPENDED
+}
+
+model Teacher {
+  id              Int      @id @default(autoincrement())
+  employeeId      String   @unique
+  firstName       String
+  lastName        String?
+  dateOfBirth     DateTime
+  age             Int
+  gender          Gender
+  religion        String?
+  nationality     String   @default("Pakistani")
+
+  phone           String
+  emergencyPhone  String?
+  email           String?
+  city            String
+  address         String
+
+  designation     String
+  department      String
+  qualification   String
+  specialization  String?
+  experience      Int      @default(0)
+  joinDate        DateTime
+
+  employmentType  EmploymentType @default(FULL_TIME)
+  status          TeacherStatus  @default(ACTIVE)
+  salary          Decimal?
+
+  classes         TeacherClass[]
+  timetable  TimetableEntry[]
+  appraisals Appraisal[]
+  attendance  TeacherAttendance[]
+  leaveRequests LeaveRequest[]
+  payrolls  Payroll[]
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("teachers")
+}
+
+model TeacherClass {
+  id        Int     @id @default(autoincrement())
+  teacher   Teacher @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  teacherId Int
+  class     Class   @relation(fields: [classId], references: [id])
+  classId   Int
+  subject   String
+
+  @@map("teacher_classes")
+}
+
+enum EmploymentType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+}
+
+enum TeacherStatus {
+  ACTIVE
+  INACTIVE
+  ON_LEAVE
+  TERMINATED
+}
+
+model TimetableSlot {
+  id        Int    @id @default(autoincrement())
+  name      String  // e.g. "Period 1"
+  startTime String  // e.g. "08:00"
+  endTime   String  // e.g. "08:45"
+  order     Int     // for sorting
+
+  entries   TimetableEntry[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("timetable_slots")
+}
+
+model TimetableEntry {
+  id        Int    @id @default(autoincrement())
+  slot      TimetableSlot @relation(fields: [slotId], references: [id])
+  slotId    Int
+  teacher   Teacher @relation(fields: [teacherId], references: [id])
+  teacherId Int
+  class     Class   @relation(fields: [classId], references: [id])
+  classId   Int
+  subject   String
+  day       Day
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([slotId, classId, day]) // one teacher per slot per class per day
+  @@unique([slotId, teacherId, day]) // teacher can't be in two places at once
+  @@map("timetable_entries")
+}
+
+model Appraisal {
+  id                Int      @id @default(autoincrement())
+  teacher           Teacher  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  teacherId         Int
+  reviewDate        DateTime
+  reviewedBy        String   // admin name
+  punctuality       Float    // 1-5
+  teachingQuality   Float
+  studentResults    Float
+  discipline        Float
+  communication     Float
+  overallScore      Float    // auto calculated
+  grade             String   // Excellent / Good / Average / Needs Improvement
+  remarks           String?  @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("appraisals")
+}
+
+enum Day {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+}
+
+model Section {
+  id        Int     @id @default(autoincrement())
+  name      String  // e.g. "A", "B", "C"
+  classId   Int
+  class     Class   @relation(fields: [classId], references: [id], onDelete: Cascade)
+  capacity  Int     @default(40)
+  createdAt DateTime @default(now())
+
+  @@unique([classId, name])
+  @@map("sections")
+}
+
+model Subject {
+  id          Int      @id @default(autoincrement())
+  name        String   // e.g. "Mathematics"
+  code        String?  // e.g. "MATH-01"
+  description String?  @db.Text
+  classId     Int
+  class       Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  syllabus  Syllabus[]
+  exams     Exam[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("subjects")
+}
+
+model Syllabus {
+  id          Int      @id @default(autoincrement())
+  classId     Int
+  class       Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  subjectId   Int
+  subject     Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  term        String   // e.g. "Term 1", "Term 2", "Full Year"
+  title       String
+  description String?  @db.Text
+  status      SyllabusStatus @default(PLANNED)
+  startDate   DateTime?
+  endDate     DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("syllabus")
+}
+
+enum SyllabusStatus {
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+}
+
+model Notice {
+  id          Int          @id @default(autoincrement())
+  title       String
+  content     String       @db.Text
+  category    String       // General, Exam, Holiday, Event, Fee, Urgent
+  priority    NoticePriority @default(NORMAL)
+  targetAudience String    // All, Students, Teachers, Parents
+  publishDate DateTime     @default(now())
+  expiryDate  DateTime?
+  isPublished Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@map("notices")
+}
+
+model Message {
+  id          Int           @id @default(autoincrement())
+  subject     String
+  body        String        @db.Text
+  senderName  String
+  senderRole  String        @default("Admin")
+  recipientType String      // Individual, Class, All Students, All Teachers, All
+  classId     Int?
+  class       Class?        @relation(fields: [classId], references: [id], onDelete: SetNull)
+  recipientName String?     // for individual
+  isRead      Boolean       @default(false)
+  sentAt      DateTime      @default(now())
+  createdAt   DateTime      @default(now())
+
+  @@map("messages")
+}
+
+enum NoticePriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+model Parent {
+  id            Int      @id @default(autoincrement())
+  name          String
+  email         String?  @unique
+  phone         String
+  cnic          String?
+  address       String?
+  portalAccess  Boolean  @default(false)
+  portalPin     String?  // simple 4-digit PIN for portal login
+  relation      String   @default("Parent") // Father, Mother, Guardian
+  students      ParentStudent[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("parents")
+}
+
+model ParentStudent {
+  id        Int     @id @default(autoincrement())
+  parent    Parent  @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  parentId  Int
+  student   Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  studentId Int
+
+  @@unique([parentId, studentId])
+  @@map("parent_students")
+}
+
+model Staff {
+  id              Int          @id @default(autoincrement())
+  employeeId      String       @unique
+  firstName       String
+  lastName        String?
+  dateOfBirth     DateTime
+  age             Int
+  gender          Gender       // reuse existing enum
+  religion        String?
+  nationality     String       @default("Pakistani")
+  bloodGroup      String?
+  profileImage    String?
+
+  phone           String
+  emergencyPhone  String?
+  email           String?
+  city            String
+  address         String
+
+  designation     String
+  department      String?
+  role            String?      // e.g. "Administrative", "Support"
+
+  qualification   String?
+  experience      Int          @default(0)
+  joinDate        DateTime
+
+  dutyStartTime   String?      // e.g. "08:00"
+  dutyEndTime     String?      // e.g. "16:00"
+
+  employmentType  EmploymentType @default(FULL_TIME)  // reuse existing enum
+  status          StaffStatus    @default(ACTIVE)
+  salary          Decimal?
+
+  attendance  StaffAttendance[]
+  leaveRequests LeaveRequest[]
+  payrolls  Payroll[]
+
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@map("staff")
+}
+
+enum StaffStatus {
+  ACTIVE
+  INACTIVE
+  ON_LEAVE
+  TERMINATED
+}
+
+model Book {
+  id            Int      @id @default(autoincrement())
+  title         String
+  author        String
+  isbn          String?  @unique
+  category      String
+  publisher     String?
+  publishYear   Int?
+  totalCopies   Int      @default(1)
+  availableCopies Int    @default(1)
+  shelf         String?
+  language      String   @default("Urdu")
+  description   String?  @db.Text
+  status        BookStatus @default(AVAILABLE)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  issues        BookIssue[]
+
+  @@map("books")
+}
+
+model BookIssue {
+  id           Int         @id @default(autoincrement())
+  book         Book        @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  bookId       Int
+  borrowerName String
+  borrowerType BorrowerType @default(STUDENT)
+  borrowerId   String?
+  issueDate    DateTime    @default(now())
+  dueDate      DateTime
+  returnDate   DateTime?
+  status       IssueStatus @default(ISSUED)
+  fineAmount   Float       @default(0)
+  finePaid     Boolean     @default(false)
+  remarks      String?
+  fine   LibraryFine?
+
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@map("book_issues")
+}
+
+enum BookStatus {
+  AVAILABLE
+  OUT_OF_STOCK
+  LOST
+  DAMAGED
+}
+
+enum BorrowerType {
+  STUDENT
+  TEACHER
+  STAFF
+}
+
+enum IssueStatus {
+  ISSUED
+  RETURNED
+  OVERDUE
+  LOST
+}
+
+model LibraryMember {
+  id           Int          @id @default(autoincrement())
+  memberId     String       @unique
+  name         String
+  memberType   MemberType   @default(STUDENT)
+  referenceId  String?      // studentId or employeeId
+  classId      Int?
+  class        Class?       @relation(fields: [classId], references: [id], onDelete: SetNull)
+  phone        String?
+  email        String?
+  address      String?
+  membershipStart DateTime  @default(now())
+  membershipEnd   DateTime?
+  status       MemberStatus @default(ACTIVE)
+  totalIssued  Int          @default(0)
+  fines  LibraryFine[]
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@map("library_members")
+}
+
+enum MemberType {
+  STUDENT
+  TEACHER
+  STAFF
+}
+
+enum MemberStatus {
+  ACTIVE
+  SUSPENDED
+  EXPIRED
+}
+
+model LibraryFine {
+  id           Int         @id @default(autoincrement())
+  memberId     Int?
+  member       LibraryMember? @relation(fields: [memberId], references: [id], onDelete: SetNull)
+  bookIssueId  Int?        @unique
+  bookIssue    BookIssue?  @relation(fields: [bookIssueId], references: [id], onDelete: SetNull)
+  borrowerName String
+  bookTitle    String
+  fineType     FineType    @default(OVERDUE)
+  amount       Float
+  paidAmount   Float       @default(0)
+  status       FineStatus  @default(UNPAID)
+  dueDate      DateTime?
+  paidDate     DateTime?
+  remarks      String?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@map("library_fines")
+}
+
+enum FineType {
+  OVERDUE
+  LOST
+  DAMAGED
+  OTHER
+}
+
+enum FineStatus {
+  UNPAID
+  PARTIAL
+  PAID
+  WAIVED
+}
+
+model StudentAttendance {
+  id        Int              @id @default(autoincrement())
+  student   Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  studentId Int
+  date      DateTime         @db.Date
+  status    AttendanceStatus @default(PRESENT)
+  remarks   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([studentId, date]) // one record per student per day
+  @@map("student_attendance")
+}
+
+model TeacherAttendance {
+  id        Int              @id @default(autoincrement())
+  teacher   Teacher          @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  teacherId Int
+  date      DateTime         @db.Date
+  status    AttendanceStatus @default(PRESENT)
+  checkIn   String?          // e.g. "08:05"
+  checkOut  String?          // e.g. "14:30"
+  remarks   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([teacherId, date])
+  @@map("teacher_attendance")
+}
+
+model StaffAttendance {
+  id        Int              @id @default(autoincrement())
+  staff     Staff            @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  staffId   Int
+  date      DateTime         @db.Date
+  status    AttendanceStatus @default(PRESENT)
+  checkIn   String?          // e.g. "08:05"
+  checkOut  String?          // e.g. "16:30"
+  remarks   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([staffId, date])
+  @@map("staff_attendance")
+}
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  LEAVE
+}
+
+
+model LeaveRequest {
+  id            Int           @id @default(autoincrement())
+  leaveType     LeaveType     @default(SICK)
+  applicantType ApplicantType
+  reason        String
+  fromDate      DateTime
+  toDate        DateTime
+  totalDays     Int
+  status        LeaveStatus   @default(PENDING)
+  remarks       String?       // admin remarks on approve/reject
+  appliedAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  studentId     Int?
+  student       Student?      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  teacherId     Int?
+  teacher       Teacher?      @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+
+  staffId       Int?
+  staff         Staff?        @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@index([studentId])
+  @@index([teacherId])
+  @@index([status])
+  @@index([fromDate, toDate])
+}
+
+enum LeaveType {
+  SICK
+  CASUAL
+  EMERGENCY
+  MATERNITY
+  PATERNITY
+  UNPAID
+  OTHER
+}
+
+enum ApplicantType {
+  STUDENT
+  TEACHER
+  STAFF
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+model Exam {
+  id          Int        @id @default(autoincrement())
+  title       String
+  examType    ExamType   @default(MIDTERM)
+  classId     Int
+  class       Class      @relation(fields: [classId], references: [id], onDelete: Cascade)
+  subjectId   Int
+  subject     Subject    @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  date        DateTime   @db.Date
+  startTime   String     // e.g. "09:00"
+  duration    Int        // in minutes
+  totalMarks  Int        @default(100)
+  passingMarks Int       @default(40)
+  venue       String?
+  status      ExamStatus @default(SCHEDULED)
+  remarks     String?    @db.Text
+
+  marks       ExamMark[]
+
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@map("exams")
+}
+
+model ExamMark {
+  id          Int      @id @default(autoincrement())
+  exam        Exam     @relation(fields: [examId], references: [id], onDelete: Cascade)
+  examId      Int
+  student     Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  studentId   Int
+  marksObtained Float?
+  isAbsent    Boolean  @default(false)
+  remarks     String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([examId, studentId])
+  @@map("exam_marks")
+}
+
+enum ExamType {
+  MIDTERM
+  FINAL
+  UNIT_TEST
+  QUIZ
+  PRACTICAL
+  MOCK
+}
+
+enum ExamStatus {
+  SCHEDULED
+  ONGOING
+  COMPLETED
+  CANCELLED
+}
+
+model GradeConfig {
+  id         Int      @id @default(autoincrement())
+  grade      String   // "A+", "A", "B", "C", "D", "F"
+  minPercent Float    // 90.0
+  maxPercent Float    // 100.0
+  label      String   // "Outstanding", "Excellent" etc
+  gpaPoints  Float?   // 4.0, 3.7 etc (optional)
+  order      Int      // for sorting display
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("grade_configs")
+}
+
+// ─── Finance ────────────────────────────────────────────────────────────────
+
+model FeeStructure {
+  id          Int       @id @default(autoincrement())
+  name        String                        // e.g. "Annual Fee 2025-26"
+  classId     Int
+  class       Class     @relation(fields: [classId], references: [id], onDelete: Cascade)
+  feeType     FeeType   @default(TUITION)
+  amount      Decimal   @db.Decimal(10, 2)
+  frequency   FeeFrequency @default(MONTHLY)
+  dueDay      Int       @default(10)        // day of month payment is due
+  academicYear String                       // e.g. "2025-26"
+  isActive    Boolean   @default(true)
+  description String?
+  feeItems    FeeItem[]
+  collections FeeCollection[]
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([classId])
+  @@index([academicYear])
+  @@map("fee_structures")
+}
+
+model FeeItem {
+  id             Int          @id @default(autoincrement())
+  feeStructure   FeeStructure @relation(fields: [feeStructureId], references: [id], onDelete: Cascade)
+  feeStructureId Int
+  label          String       // e.g. "Tuition Fee", "Lab Fee"
+  amount         Decimal      @db.Decimal(10, 2)
+  isOptional     Boolean      @default(false)
+
+  @@map("fee_items")
+}
+
+model FeeCollection {
+  id             Int           @id @default(autoincrement())
+  feeStructure   FeeStructure  @relation(fields: [feeStructureId], references: [id], onDelete: Cascade)
+  feeStructureId Int
+  student        Student       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  studentId      Int
+  month          String?       // e.g. "2025-09" for monthly fees
+  amountDue      Decimal       @db.Decimal(10, 2)
+  amountPaid     Decimal       @db.Decimal(10, 2) @default(0)
+  discount       Decimal       @db.Decimal(10, 2) @default(0)
+  fine           Decimal       @db.Decimal(10, 2) @default(0)
+  status         FeeStatus     @default(UNPAID)
+  paidAt         DateTime?
+  dueDate        DateTime
+  remarks        String?
+  receiptNo      String?       @unique
+
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([studentId])
+  @@index([feeStructureId])
+  @@index([status])
+  @@map("fee_collections")
+}
+
+enum FeeType {
+  TUITION
+  ADMISSION
+  EXAMINATION
+  LIBRARY
+  TRANSPORT
+  SPORTS
+  LABORATORY
+  UNIFORM
+  OTHER
+}
+
+enum FeeFrequency {
+  MONTHLY
+  QUARTERLY
+  ANNUALLY
+  ONE_TIME
+}
+
+enum FeeStatus {
+  UNPAID
+  PARTIAL
+  PAID
+  WAIVED
+  OVERDUE
+}
+
+model Expense {
+  id            Int             @id @default(autoincrement())
+  title         String                          // e.g. "Electricity Bill - October"
+  amount        Decimal         @db.Decimal(10, 2)
+  category      ExpenseCategory @default(OTHER)
+  date          DateTime        @db.Date        // date expense was incurred
+  paidTo        String?                         // vendor / person name
+  paymentMethod ExpensePayment  @default(CASH)
+  status        ExpenseStatus   @default(PENDING)
+  approvedBy    String?                         // admin name who approved
+  referenceNo   String?                         // bill / voucher / cheque no
+  description   String?         @db.Text
+  academicYear  String                          // e.g. "2025-26"
+
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  @@index([category])
+  @@index([status])
+  @@index([date])
+  @@index([academicYear])
+  @@map("expenses")
+}
+
+enum ExpenseCategory {
+  SALARY
+  UTILITIES
+  MAINTENANCE
+  STATIONERY
+  TRANSPORT
+  FOOD
+  EVENTS
+  EQUIPMENT
+  RENT
+  MARKETING
+  CLEANING
+  SECURITY
+  OTHER
+}
+
+enum ExpensePayment {
+  CASH
+  BANK_TRANSFER
+  CHEQUE
+  ONLINE
+}
+
+enum ExpenseStatus {
+  PENDING
+  PAID
+  CANCELLED
+}
+
+
+model Payroll {
+  id             Int            @id @default(autoincrement())
+  employeeType   EmployeeType                         // TEACHER or STAFF
+  teacherId      Int?
+  teacher        Teacher?       @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  staffId        Int?
+  staff          Staff?         @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  month          String                               // e.g. "2025-09"
+  academicYear   String                               // e.g. "2025-26"
+
+  basicSalary    Decimal        @db.Decimal(10, 2)   // base salary from Teacher/Staff record
+  bonus          Decimal        @db.Decimal(10, 2)   @default(0)
+  deduction      Decimal        @db.Decimal(10, 2)   @default(0)
+  netSalary      Decimal        @db.Decimal(10, 2)   // basicSalary + bonus - deduction
+
+  status         PayrollStatus  @default(PENDING)
+  paymentMethod  PayrollPayment @default(CASH)
+  paidAt         DateTime?
+  paidBy         String?                              // admin who processed payment
+  remarks        String?        @db.Text
+
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@unique([teacherId, month])                        // one payroll per teacher per month
+  @@unique([staffId,   month])                        // one payroll per staff per month
+  @@index([employeeType])
+  @@index([status])
+  @@index([month])
+  @@index([academicYear])
+  @@map("payrolls")
+}
+
+enum EmployeeType {
+  TEACHER
+  STAFF
+}
+
+enum PayrollStatus {
+  PENDING
+  PAID
+  CANCELLED
+}
+
+enum PayrollPayment {
+  CASH
+  BANK_TRANSFER
+  CHEQUE
+  ONLINE
+}
